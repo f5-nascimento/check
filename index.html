@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f8fafc">
+  <title>Checklist Diário</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --soft: #f1f5f9;
+      --accent: #172033;
+      --success: #15803d;
+      --danger: #b91c1c;
+      --shadow: 0 10px 30px rgba(15, 23, 42, .06);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .app { width: min(760px, calc(100% - 32px)); margin: 42px auto; }
+    .topline { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+    .eyebrow { color: var(--muted); font-size: .82rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 4px 0 0; font-size: clamp(1.55rem, 4vw, 2rem); letter-spacing: -.035em; }
+    .date-chip { border: 1px solid var(--border); background: var(--panel); border-radius: 999px; padding: 8px 12px; color: var(--muted); white-space: nowrap; font-size: .9rem; }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: clamp(18px, 4vw, 28px); box-shadow: var(--shadow); }
+    .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+    h2 { margin: 0; font-size: 1.2rem; letter-spacing: -.02em; }
+    .count { font-size: .85rem; border: 1px solid var(--border); border-radius: 999px; padding: 5px 10px; color: var(--muted); white-space: nowrap; }
+    .progress-track { width: 100%; height: 7px; background: var(--soft); border-radius: 999px; overflow: hidden; margin-bottom: 22px; }
+    .progress-fill { height: 100%; width: 0%; background: var(--accent); border-radius: inherit; transition: width .2s ease; }
+    .task-list { display: flex; flex-direction: column; }
+    .task-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 15px 0; border-bottom: 1px solid var(--border); }
+    .task-row:first-child { padding-top: 0; }
+    .task-row:last-child { border-bottom: 0; }
+    .task-main { display: flex; align-items: flex-start; gap: 11px; min-width: 0; }
+    .task-check { width: 20px; height: 20px; margin: 3px 0 0; accent-color: var(--accent); flex: 0 0 auto; cursor: pointer; }
+    .task-name { overflow-wrap: anywhere; }
+    .task-name.completed { color: var(--muted); text-decoration: line-through; }
+    .task-status { display: flex; align-items: flex-end; flex-direction: column; gap: 4px; min-width: 92px; }
+    .status-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 9px; font-size: .78rem; font-weight: 650; background: var(--soft); color: var(--muted); }
+    .status-pill.done { color: var(--success); background: #f0fdf4; }
+    .task-time { font-size: .78rem; color: var(--muted); }
+    .empty { padding: 4px 0 22px; color: var(--muted); font-size: .92rem; }
+    .section-label { display: block; font-size: .9rem; font-weight: 650; margin-bottom: 8px; }
+    .add-form { display: flex; gap: 10px; margin-top: 24px; }
+    input[type="text"] { min-width: 0; flex: 1; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; color: var(--text); background: #fff; font: inherit; outline: none; }
+    input[type="text"]:focus { border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(148, 163, 184, .18); }
+    button { font: inherit; font-weight: 650; border: 1px solid transparent; border-radius: 12px; padding: 11px 15px; cursor: pointer; transition: transform .08s ease, background .15s ease; }
+    button:active { transform: translateY(1px); }
+    .primary { background: var(--accent); color: white; }
+    .primary:hover { background: #273449; }
+    .secondary { border-color: var(--border); background: #fff; color: var(--text); }
+    .secondary:hover { background: var(--soft); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    .actions button { flex: 1 1 190px; }
+    .remove-btn { border: 0; padding: 3px 6px; background: transparent; color: var(--muted); font-size: .8rem; }
+    .remove-btn:hover { color: var(--danger); }
+    .notice { margin-top: 16px; color: var(--muted); font-size: .82rem; }
+    .toast { min-height: 1.25rem; margin-top: 10px; color: var(--success); font-size: .88rem; }
+    @media (max-width: 520px) {
+      .app { margin: 24px auto; }
+      .topline { align-items: flex-start; flex-direction: column; }
+      .add-form { flex-direction: column; }
+      .add-form button { width: 100%; }
+      .task-row { gap: 8px; }
+      .task-status { min-width: 78px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topline">
+      <div>
+        <div class="eyebrow">Organização pessoal</div>
+        <h1>Checklist Diário</h1>
+      </div>
+      <div class="date-chip" id="dateLabel" aria-live="polite"></div>
+    </header>
+
+    <section class="panel" aria-labelledby="listTitle">
+      <div class="panel-head">
+        <h2 id="listTitle">Minhas tarefas de hoje</h2>
+        <span class="count" id="countLabel">0/0 concluídas</span>
+      </div>
+
+      <div class="progress-track" role="progressbar" aria-label="Progresso das tarefas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progressTrack">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+
+      <div class="empty" id="emptyMessage">Nenhuma atividade registrada ainda. Adicione sua primeira tarefa abaixo.</div>
+      <div class="task-list" id="taskList"></div>
+
+      <form class="add-form" id="taskForm">
+        <input id="taskInput" type="text" maxlength="300" placeholder="Ex.: Preparar aula de banco de dados" aria-label="Nova atividade" required>
+        <button class="primary" type="submit">＋ Adicionar atividade</button>
+      </form>
+
+      <div class="actions">
+        <button class="secondary" id="copyButton" type="button">▢ Copiar checklist completo</button>
+        <button class="secondary" id="clearButton" type="button">Limpar tarefas de hoje</button>
+      </div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </section>
+
+    <p class="notice">As tarefas são salvas automaticamente neste navegador. Ao abrir em uma nova data, a lista do dia anterior é limpa. Evite limpar os dados do navegador se quiser manter o checklist atual até a próxima virada de dia.</p>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const STORAGE_KEY = "checklistDiario.v1";
+      const dateLabel = document.getElementById("dateLabel");
+      const countLabel = document.getElementById("countLabel");
+      const progressFill = document.getElementById("progressFill");
+      const progressTrack = document.getElementById("progressTrack");
+      const taskList = document.getElementById("taskList");
+      const emptyMessage = document.getElementById("emptyMessage");
+      const taskForm = document.getElementById("taskForm");
+      const taskInput = document.getElementById("taskInput");
+      const copyButton = document.getElementById("copyButton");
+      const clearButton = document.getElementById("clearButton");
+      const toast = document.getElementById("toast");
+
+      let currentDate = getLocalDateKey();
+      let tasks = loadTasksForToday();
+
+      function getLocalDateKey(date = new Date()) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+
+      function formatDate(date = new Date()) {
+        return new Intl.DateTimeFormat("pt-BR", {
+          weekday: "long", day: "2-digit", month: "long", year: "numeric"
+        }).format(date);
+      }
+
+      function getStorageData() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch (error) {
+          console.warn("Não foi possível ler os dados salvos.", error);
+          return null;
+        }
+      }
+
+      function loadTasksForToday() {
+        const saved = getStorageData();
+        // A chave armazena apenas o dia atual: se a data mudou, o dia anterior é descartado.
+        if (saved && saved.date === currentDate && Array.isArray(saved.tasks)) {
+          return saved.tasks;
+        }
+        saveTasks([]);
+        return [];
+      }
+
+      function saveTasks(nextTasks = tasks) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            date: currentDate,
+            tasks: nextTasks,
+            updatedAt: new Date().toISOString()
+          }));
+          return true;
+        } catch (error) {
+          showToast("Não foi possível salvar. Verifique o espaço ou as permissões do navegador.", true);
+          console.error("Erro ao salvar no localStorage.", error);
+          return false;
+        }
+      }
+
+      function showToast(message, isError = false) {
+        toast.textContent = message;
+        toast.style.color = isError ? "var(--danger)" : "var(--success)";
+      }
+
+      function makeId() {
+        return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+
+      function render() {
+        dateLabel.textContent = formatDate();
+        taskList.replaceChildren();
+        emptyMessage.hidden = tasks.length > 0;
+
+        let completed = 0;
+        tasks.forEach(task => {
+          if (task.done) completed++;
+
+          const row = document.createElement("div");
+          row.className = "task-row";
+
+          const main = document.createElement("div");
+          main.className = "task-main";
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.className = "task-check";
+          checkbox.checked = Boolean(task.done);
+          checkbox.setAttribute("aria-label", `Concluir: ${task.name}`);
+          checkbox.addEventListener("change", () => toggleTask(task.id, checkbox.checked));
+
+          const name = document.createElement("div");
+          name.className = `task-name${task.done ? " completed" : ""}`;
+          name.textContent = task.name;
+
+          main.append(checkbox, name);
+
+          const status = document.createElement("div");
+          status.className = "task-status";
+
+          const pill = document.createElement("span");
+          pill.className = `status-pill${task.done ? " done" : ""}`;
+          pill.textContent = task.done ? "Concluída" : "Pendente";
+          status.append(pill);
+
+          if (task.done && task.completedAt) {
+            const time = document.createElement("span");
+            time.className = "task-time";
+            time.textContent = `Às ${task.completedAt}`;
+            status.append(time);
+          }
+
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "remove-btn";
+          remove.textContent = "Remover";
+          remove.setAttribute("aria-label", `Remover tarefa: ${task.name}`);
+          remove.addEventListener("click", () => removeTask(task.id));
+          status.append(remove);
+
+          row.append(main, status);
+          taskList.append(row);
+        });
+
+        const total = tasks.length;
+        const percent = total ? Math.round((completed / total) * 100) : 0;
+        countLabel.textContent = `${completed}/${total} concluídas`;
+        progressFill.style.width = `${percent}%`;
+        progressTrack.setAttribute("aria-valuenow", String(percent));
+      }
+
+      function addTask(name) {
+        const cleanName = name.trim();
+        if (!cleanName) return;
+        tasks.push({ id: makeId(), name: cleanName, done: false, completedAt: null });
+        saveTasks();
+        render();
+        showToast("Atividade adicionada e salva.");
+      }
+
+      function toggleTask(id, isDone) {
+        const task = tasks.find(item => item.id === id);
+        if (!task) return;
+
+        task.done = isDone;
+        task.completedAt = isDone
+          ? new Intl.DateTimeFormat("pt-BR", {
+              hour: "2-digit", minute: "2-digit", second: "2-digit"
+            }).format(new Date())
+          : null;
+
+        saveTasks();
+        render();
+        showToast(isDone ? `Tarefa concluída às ${task.completedAt}.` : "Tarefa reaberta.");
+      }
+
+      function removeTask(id) {
+        const task = tasks.find(item => item.id === id);
+        if (!task) return;
+        tasks = tasks.filter(item => item.id !== id);
+        saveTasks();
+        render();
+        showToast("Atividade removida.");
+      }
+
+      function checkDateRollover() {
+        const today = getLocalDateKey();
+        if (today !== currentDate) {
+          currentDate = today;
+          tasks = loadTasksForToday();
+          render();
+          showToast("Novo dia iniciado. O checklist anterior foi limpo.");
+        }
+      }
+
+      taskForm.addEventListener("submit", event => {
+        event.preventDefault();
+        addTask(taskInput.value);
+        taskInput.value = "";
+        taskInput.focus();
+      });
+
+      copyButton.addEventListener("click", async () => {
+        const lines = [
+          `CHECKLIST DE ATIVIDADES — ${formatDate()}`,
+          "",
+          ...tasks.map(task =>
+            `${task.done ? "[x]" : "[ ]"} ${task.name}${task.done ? ` — Concluída às ${task.completedAt || "horário não registrado"}` : " — Pendente"}`
+          )
+        ];
+        const content = lines.join("\n");
+
+        try {
+          await navigator.clipboard.writeText(content);
+          showToast("Checklist completo copiado.");
+        } catch (error) {
+          const textArea = document.createElement("textarea");
+          textArea.value = content;
+          textArea.style.position = "fixed";
+          textArea.style.opacity = "0";
+          document.body.append(textArea);
+          textArea.select();
+          const copied = document.execCommand("copy");
+          textArea.remove();
+          showToast(copied ? "Checklist completo copiado." : "Não foi possível copiar automaticamente.", !copied);
+        }
+      });
+
+      clearButton.addEventListener("click", () => {
+        if (!tasks.length) {
+          showToast("Não há tarefas para limpar.");
+          return;
+        }
+        const confirmed = window.confirm("Deseja apagar todas as tarefas de hoje? Essa ação não pode ser desfeita.");
+        if (!confirmed) return;
+        tasks = [];
+        saveTasks();
+        render();
+        showToast("Todas as tarefas de hoje foram removidas.");
+      });
+
+      // Limpa na primeira abertura após a mudança de data e também se a página ficar aberta à meia-noite.
+      render();
+      window.addEventListener("focus", checkDateRollover);
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) checkDateRollover();
+      });
+      // Verificação periódica enquanto a página está aberta.
+      window.setInterval(checkDateRollover, 60 * 1000);
+    })();
+  </script>
+</body>
+</html>
